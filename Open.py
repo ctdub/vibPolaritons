@@ -2,7 +2,7 @@ import twadynamics as twa
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-matplotlib.use('Qt5Agg')
+# matplotlib.use('Qt5Agg')
 
 
 # define a range of cavity freqency values
@@ -60,4 +60,5 @@ plt.gca().yaxis.set_tick_params(width=2)
 legend = plt.legend(title='$x = $', loc='center left', bbox_to_anchor=(1, 0.5), fancybox=True, fontsize=16)
 legend.get_title().set_fontsize('20')
 legend.get_frame().set_edgecolor('black')
+plt.show()
 
