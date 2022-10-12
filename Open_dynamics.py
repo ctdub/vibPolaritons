@@ -5,32 +5,26 @@ import matplotlib.pyplot as plt
 # matplotlib.use('Qt5Agg')
 
 
-# define a range of cavity freqency values
-wavenumberToHartree = 4.55633e-6
-freqRange = np.linspace(1000, 2400, 6)
-freqRangeHa = freqRange * wavenumberToHartree
-
 # True if figure should be saved
 savefig = False
 
 # define on resonant cavity vibration system
 system = twa.evo(jccoupling=0.04e-3, huangrhys=0.5)
-system = twa.evo(jccoupling=0)
 
 # calculate time range
-totalTime = 18
+totalTime = 12
 steps = 1000
 timeRange = np.linspace(0, totalTime, steps)
 timeRangeAU = timeRange / 2.41889E-5
 
-qFact = 6
+qFact = 100
 fieldDamp = 1 / (2 * np.pi * qFact)
 qFactBath = 602.7672470628711  # gives vibrational lifetime of 2 ps
 bathDamp = 1 / (2 * np.pi * qFactBath)
 # bathDamp = 3.92417e-6**2 * (500/0.004) / system.freqV
 # bathDamp = 1e-6**2 * (1000/0.004) / system.freqV
 
-system.addbath(bathsize=1000, fieldsize=1000, bdamp=bathDamp, fdamp=fieldDamp)
+system.addbath(bathsize=500, fieldsize=500, bdamp=bathDamp, fdamp=fieldDamp)
 # spec = system.spectra(timeRangeAU)
 #
 # plt.plot(spec)
@@ -44,8 +38,11 @@ nCav, nVib, nField, nBath = system.occ(timeRangeAU)
 # system.addbath(bathsize=500, fieldsize=0, bdamp=3, fdamp=0, dfreq=0.004)
 # nCav, nVib, nField, nBath = system.occ(timeRangeAU)
 
-plt.plot(timeRange, nVib, label='cavity')
+plt.plot(timeRange, nCav, label='cavity', color='black')
+plt.plot(timeRange, nVib, label='vibration')
+plt.plot(timeRange, nField, label='Field')
 plt.plot(timeRange, nBath, label='bath')
+
 plt.gca().spines['left'].set_linewidth(2)
 plt.gca().spines['bottom'].set_linewidth(2)
 plt.gca().spines['top'].set_visible(False)
@@ -61,4 +58,4 @@ legend = plt.legend(title='$x = $', loc='center left', bbox_to_anchor=(1, 0.5), 
 legend.get_title().set_fontsize('20')
 legend.get_frame().set_edgecolor('black')
 plt.show()
-
+print(nField[-1])

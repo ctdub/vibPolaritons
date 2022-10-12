@@ -1,6 +1,7 @@
 import numpy as np
 from numpy import linalg as LA
 
+
 class evo:
     def __init__(self, cavityfreq=1600, vibrationfreq=1600, huangrhys=0.75, jccoupling=0.01e-3):
         wavenumberToHartree = 4.55633e-6
@@ -15,6 +16,7 @@ class evo:
         self.systemSize = 2
         self.eigvals = []
         self.eigvecs = []
+        self.dfrequency = 0
         self.bCouplingFn = []
         self.fCouplingFn = []
         self.totalSize = self.systemSize
@@ -22,26 +24,35 @@ class evo:
 
     def addbath(self, bathsize=500, fieldsize=500, dfreq=0.004, bdamp=0, fdamp=0):
         # add the bath and fields to the total size
+        self.dfrequency = dfreq
         self.totalSize = self.systemSize + bathsize + fieldsize
         self.hessian = np.zeros((self.totalSize, self.totalSize))
         self.fieldSize = fieldsize
         self.bathSize = bathsize
         # Diagonal elements of the free field energies
         if fieldsize != 0:
-            self.fieldEnDiag = np.linspace(self.freqC - dfreq/2, self.freqC + dfreq/2, fieldsize) ** 2
+            self.fieldEnDiag = np.linspace(self.freqC - dfreq / 2, self.freqC + dfreq / 2, fieldsize) ** 2
         # and bath energies
         if bathsize != 0:
-            self.bathEnDiag = np.linspace(self.freqV - dfreq/2, self.freqV + dfreq/2, bathsize) ** 2
+            self.bathEnDiag = np.linspace(self.freqV - dfreq / 2, self.freqV + dfreq / 2, bathsize) ** 2
 
         # create the frequency dependent coupling function for both the external free fields
-        self.fCouplingFn = np.multiply(2 * np.sqrt(self.freqC * np.sqrt(self.fieldEnDiag)), np.sqrt(fdamp * np.sqrt(self.fieldEnDiag) * dfreq / fieldsize))
+        self.fCouplingFn = np.multiply(2 * np.sqrt(self.freqC * np.sqrt(self.fieldEnDiag)),
+                                       np.sqrt(fdamp * np.sqrt(self.fieldEnDiag) * dfreq / fieldsize))
         # self.fCouplingFn = np.full(self.fieldSize, 2 * np.sqrt(self.freqC * self.freqC) * (self.freqC/(2 * np.pi * (500/0.004) * 1000000))**0.5)
         # and bath
-        self.bCouplingFn = np.multiply(2 * np.sqrt(self.freqV * np.sqrt(self.bathEnDiag)), np.sqrt(bdamp * np.sqrt(self.bathEnDiag) * dfreq / bathsize))
+        self.bCouplingFn = np.multiply(2 * np.sqrt(self.freqV * np.sqrt(self.bathEnDiag)),
+                                       np.sqrt(bdamp * np.sqrt(self.bathEnDiag) * dfreq / bathsize))
 
-        # self.bCouplingFn = np.full(self.bathSize, 2 * np.sqrt(self.freqV * self.freqV) * 3.92417e-06)
+    def updatefCoupling(self, fdamp):
+        self.fCouplingFn = np.multiply(2 * np.sqrt(self.freqC * np.sqrt(self.fieldEnDiag)),
+                                       np.sqrt(fdamp * np.sqrt(self.fieldEnDiag) * self.dfrequency / self.fieldSize))
 
-    def occ(self, time):
+    def updatebCoupling(self, bdamp):
+        self.bCouplingFn = np.multiply(2 * np.sqrt(self.freqV * np.sqrt(self.bathEnDiag)),
+                                       np.sqrt(bdamp * np.sqrt(self.bathEnDiag) * self.dfrequency / self.bathSize))
+
+    def occ(self, time, cav=True, vib=True, field=True, bath=True):
         # Determine the re-organization energy, lambda.
         lmbda = self.hr * self.freqV
         # Calculates the Hessain matrix coupling strength from the Jaynes-Cummings coupling strength.
@@ -74,16 +85,19 @@ class evo:
         self.eigvecs = u
 
         # calculated constant prefactors
+
         # cavity:
-        acav1 = 1 / (2 * self.freqC)
-        acav2 = 2 * self.freqC
-        acav3 = 1 / self.freqC
-        acav4 = self.freqC
+        if cav:
+            acav1 = 1 / (2 * self.freqC)
+            acav2 = 2 * self.freqC
+            acav3 = 1 / self.freqC
+            acav4 = self.freqC
         # vibration:
-        avib1 = 1 / (2 * self.freqV)
-        avib2 = 2 * self.freqV
-        avib3 = 1 / self.freqV
-        avib4 = self.freqV
+        if vib:
+            avib1 = 1 / (2 * self.freqV)
+            avib2 = 2 * self.freqV
+            avib3 = 1 / self.freqV
+            avib4 = self.freqV
         # fields
         afield1 = 1 / (2 * np.sqrt(self.fieldEnDiag))
         afield2 = 2 * np.sqrt(self.fieldEnDiag)
@@ -94,81 +108,92 @@ class evo:
         abath3 = 1 / np.sqrt(self.bathEnDiag)
         abath4 = np.sqrt(self.bathEnDiag)
 
-        # define time dependent matrices
         # cavity:
-        ccav1 = np.zeros((hvals.size, time.size))
-        ccav2 = np.zeros((hvals.size, time.size))
-        # vibration
-        cvib1 = np.zeros((hvals.size, time.size))
-        cvib2 = np.zeros((hvals.size, time.size))
-        # fields
-        cfield1 = np.zeros((hvals.size, time.size))
-        cfield2 = np.zeros((hvals.size, time.size))
-        # bath
-        cbath1 = np.zeros((hvals.size, time.size))
-        cbath2 = np.zeros((hvals.size, time.size))
+        if cav:
+            # define time dependent matrices
+            ccav1 = np.zeros((hvals.size, time.size))
+            ccav2 = np.zeros((hvals.size, time.size))
 
-        # define matrices for the thermal term.
-        # cavity
-        ccav3 = np.sqrt(hvals)
-        ccav4 = 1 / ccav3
-        # vibration
-        cvib3 = np.sqrt(hvals)
-        cvib4 = 1 / cvib3
-        # fields
-        cfield3 = np.sqrt(hvals)
-        cfield4 = 1 / cfield3
-        # bath
-        cbath3 = np.sqrt(hvals)
-        cbath4 = 1 / cbath3
+            # define matrices for the thermal term.
+            ccav3 = np.sqrt(hvals)
+            ccav4 = 1 / ccav3
 
-        # transformation coefficients for transforming from localized basis to delocalized polariton basis
-        # cavity
-        bcav = u[0, :]
-        # vibration
-        bvib = u[1, :]
-        # fields
-        bfield = u[self.systemSize:self.fieldSize + self.systemSize, :]
-        # baths
-        bbath = u[self.systemSize + self.fieldSize:self.systemSize + self.fieldSize + self.bathSize, :]
+            # transformation coefficients for transforming from localized basis to delocalized polariton basis
+            bcav = u[0, :]
+
+        if vib:
+            cvib1 = np.zeros((hvals.size, time.size))
+            cvib2 = np.zeros((hvals.size, time.size))
+
+            cvib3 = np.sqrt(hvals)
+            cvib4 = 1 / cvib3
+
+            bvib = u[1, :]
+
+        if field:
+            cfield1 = np.zeros((hvals.size, time.size))
+            cfield2 = np.zeros((hvals.size, time.size))
+
+            cfield3 = np.sqrt(hvals)
+            cfield4 = 1 / cfield3
+
+            bfield = u[self.systemSize:self.fieldSize + self.systemSize, :]
+
+        if bath:
+            cbath1 = np.zeros((hvals.size, time.size))
+            cbath2 = np.zeros((hvals.size, time.size))
+
+            cbath3 = np.sqrt(hvals)
+            cbath4 = 1 / cbath3
+
+            bbath = u[self.systemSize + self.fieldSize:self.systemSize + self.fieldSize + self.bathSize, :]
+
 
         # calculation of occupation values as a function of time using matrix math and numpy for efficiency
         i = 0
         for Omega in np.sqrt(hvals):
             # multiply the current eigen frequency by each point in the time array
             omeg_t = Omega * time
-            # cavity
-            ccav1[i] = u[1, i] * np.sin(omeg_t) / Omega
-            ccav2[i] = u[1, i] * (np.sin(omeg_t / 2) ** 2) / Omega ** 2
-            # vibration
-            cvib1[i] = u[1, i] * np.sin(omeg_t) / Omega
-            cvib2[i] = u[1, i] * (np.sin(omeg_t / 2) ** 2) / Omega ** 2
-            # fields
-            cfield1[i] = u[1, i] * np.sin(omeg_t) / Omega
-            cfield2[i] = u[1, i] * (np.sin(omeg_t / 2) ** 2) / Omega ** 2
-            # bath
-            cbath1[i] = u[1, i] * np.sin(omeg_t) / Omega
-            cbath2[i] = u[1, i] * (np.sin(omeg_t / 2) ** 2) / Omega ** 2
+
+            if cav:
+                ccav1[i] = u[1, i] * np.sin(omeg_t) / Omega
+                ccav2[i] = u[1, i] * (np.sin(omeg_t / 2) ** 2) / Omega ** 2
+
+            if vib:
+                cvib1[i] = u[1, i] * np.sin(omeg_t) / Omega
+                cvib2[i] = u[1, i] * (np.sin(omeg_t / 2) ** 2) / Omega ** 2
+
+            if field:
+                cfield1[i] = u[1, i] * np.sin(omeg_t) / Omega
+                cfield2[i] = u[1, i] * (np.sin(omeg_t / 2) ** 2) / Omega ** 2
+
+            if bath:
+                cbath1[i] = u[1, i] * np.sin(omeg_t) / Omega
+                cbath2[i] = u[1, i] * (np.sin(omeg_t / 2) ** 2) / Omega ** 2
             i += 1
 
         # matrix math that calculates occupation values as a function of time
-        # cavity
-        ncav1 = acav1 * np.square(bcav.dot(ccav1)) + acav2 * np.square(bcav.dot(ccav2))
-        ncav2 = acav3 * np.square(bcav).dot(ccav3) + acav4 * np.square(bcav).dot(ccav4)
-        ncav = 2 * lmbda * self.freqV ** 2 * ncav1 + (1 / 4) * ncav2 - 0.5
-        # vibration
-        nvib1 = avib1 * np.square(bvib.dot(cvib1)) + avib2 * np.square(bvib.dot(cvib2))
-        nvib2 = - 4 * lmbda * self.freqV * bvib.dot(cvib2)
-        nvib3 = avib3 * np.square(bvib).dot(cvib3) + avib4 * np.square(bvib).dot(cvib4)
-        nvib = 2 * lmbda * self.freqV ** 2 * nvib1 + nvib2 + (1 / 4) * nvib3 - 0.5 + (lmbda / self.freqV)
-        # fields
-        nfield1 = afield1.dot(np.square(bfield.dot(cfield1))) + afield2.dot(np.square(bfield.dot(cfield2)))
-        nfield2 = afield3.dot(np.square(bfield).dot(cfield3)) + afield4.dot(np.square(bfield).dot(cfield4))
-        nfield = 2 * lmbda * self.freqV ** 2 * nfield1 + (1 / 4) * nfield2 - self.fieldSize * 0.5
-        # bath
-        nbath1 = abath1.dot(np.square(bbath.dot(cbath1))) + abath2.dot(np.square(bbath.dot(cbath2)))
-        nbath2 = abath3.dot(np.square(bbath).dot(cbath3)) + abath4.dot(np.square(bbath).dot(cbath4))
-        nbath = 2 * lmbda * self.freqV ** 2 * nbath1 + (1 / 4) * nbath2 - self.bathSize * 0.5
+        ncav = 0
+        nvib = 0
+        nfield = 0
+        nbath = 0
+        if cav:
+            ncav1 = acav1 * np.square(bcav.dot(ccav1)) + acav2 * np.square(bcav.dot(ccav2))
+            ncav2 = acav3 * np.square(bcav).dot(ccav3) + acav4 * np.square(bcav).dot(ccav4)
+            ncav = 2 * lmbda * self.freqV ** 2 * ncav1 + (1 / 4) * ncav2 - 0.5
+        if vib:
+            nvib1 = avib1 * np.square(bvib.dot(cvib1)) + avib2 * np.square(bvib.dot(cvib2))
+            nvib2 = - 4 * lmbda * self.freqV * bvib.dot(cvib2)
+            nvib3 = avib3 * np.square(bvib).dot(cvib3) + avib4 * np.square(bvib).dot(cvib4)
+            nvib = 2 * lmbda * self.freqV ** 2 * nvib1 + nvib2 + (1 / 4) * nvib3 - 0.5 + (lmbda / self.freqV)
+        if field:
+            nfield1 = afield1.dot(np.square(bfield.dot(cfield1))) + afield2.dot(np.square(bfield.dot(cfield2)))
+            nfield2 = afield3.dot(np.square(bfield).dot(cfield3)) + afield4.dot(np.square(bfield).dot(cfield4))
+            nfield = 2 * lmbda * self.freqV ** 2 * nfield1 + (1 / 4) * nfield2 - self.fieldSize * 0.5
+        if bath:
+            nbath1 = abath1.dot(np.square(bbath.dot(cbath1))) + abath2.dot(np.square(bbath.dot(cbath2)))
+            nbath2 = abath3.dot(np.square(bbath).dot(cbath3)) + abath4.dot(np.square(bbath).dot(cbath4))
+            nbath = 2 * lmbda * self.freqV ** 2 * nbath1 + (1 / 4) * nbath2 - self.bathSize * 0.5
         return ncav, nvib, nfield, nbath
 
     def spectra(self, time):
@@ -217,7 +242,6 @@ class evo:
         # define matrices for the thermal term.
         cfield3 = np.sqrt(hvals)
         cfield4 = 1 / cfield3
-
 
         # calculation of occupation values as a function of time using matrix math and numpy for efficiency
         i = 0
