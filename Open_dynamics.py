@@ -4,27 +4,32 @@ import matplotlib
 import matplotlib.pyplot as plt
 # matplotlib.use('Qt5Agg')
 
+# cavity frequency
+omegaC = 1600
 
 # True if figure should be saved
 savefig = False
 
 # define on resonant cavity vibration system
-system = twa.evo(jccoupling=0.04e-3, huangrhys=0.5)
+system = twa.evo(jccoupling=0.01e-3, huangrhys=0.5, cavityfreq=1590)
 
 # calculate time range
-totalTime = 12
+totalTime = 25
 steps = 1000
 timeRange = np.linspace(0, totalTime, steps)
 timeRangeAU = timeRange / 2.41889E-5
 
-qFact = 100
+qFact = 80
 fieldDamp = 1 / (2 * np.pi * qFact)
-qFactBath = 602.7672470628711  # gives vibrational lifetime of 2 ps
+# Sets the vibrational decay lifetime in ps.
+vibLife = 0.2
+omegaCHz = 2 * np.pi * 2.998*10**10 * omegaC
+qFactBath = omegaCHz * vibLife * 10**-12
 bathDamp = 1 / (2 * np.pi * qFactBath)
 # bathDamp = 3.92417e-6**2 * (500/0.004) / system.freqV
 # bathDamp = 1e-6**2 * (1000/0.004) / system.freqV
 
-system.addbath(bathsize=500, fieldsize=500, bdamp=bathDamp, fdamp=fieldDamp)
+system.addbath(bathsize=600, fieldsize=600, bdamp=bathDamp, fdamp=fieldDamp)
 # spec = system.spectra(timeRangeAU)
 #
 # plt.plot(spec)
@@ -58,4 +63,3 @@ legend = plt.legend(title='$x = $', loc='center left', bbox_to_anchor=(1, 0.5), 
 legend.get_title().set_fontsize('20')
 legend.get_frame().set_edgecolor('black')
 plt.show()
-print(nField[-1])
